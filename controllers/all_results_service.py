@@ -2,9 +2,12 @@ import json
 import logging
 import re
 import requests
-
+import urllib3
 
 from bs4 import BeautifulSoup
+
+# Disable SSL warnings for older results.jntuh.ac.in certificates
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 LINK1 = "http://results.jntuh.ac.in"
 LINK2 = "http://202.63.105.184/results"
@@ -23,8 +26,9 @@ class AllResults:
 
     def get_notifiations(self) -> list:
         try:
+            print("coming here")
             resp = requests.get(
-                "http://results.jntuh.ac.in/jsp/RCRVInfo.jsp", timeout=3, verify=False
+                "http://results.jntuh.ac.in/jsp/RCRVInfo.jsp", timeout=10, verify=False
             )
             soup = BeautifulSoup(resp.text, "html.parser")
             notifications = []
@@ -34,11 +38,14 @@ class AllResults:
                 date, description = current.split(" ", 1)
                 date = date.lstrip("*(").rstrip(")")
                 description = description.strip()
-                if not "b.tech" in description.lower():
-                    continue
-                notifications.append(
-                    {"notification_date": date, "notification_description": description}
-                )
+                if "btech" in description.lower() or "b.tech" in description.lower():
+                    notifications.append(
+                        {"notification_date": date,
+                            "notification_description": description}
+                    )
+
+            print(
+                f'[LS] -> controllers/all_results_service.py:34 -> notifications: {notifications}\n')
             self.save_notifications(notifications)
 
         except Exception as e:
@@ -86,6 +93,8 @@ class AllResults:
             )
             soup = BeautifulSoup(resp.text, "html.parser")
             div = soup.find("div", {"id": "panel"})
+            if not div:
+                raise Exception("something went wrong")
             soup = div.find("table")
             print(soup.contents)
             self.logger.info("SUCCESS IN SCRAPING DATA")
