@@ -24,7 +24,7 @@ else:
 def safe_redis_get(key):
     """Safely get value from Redis, return None on error"""
     try:
-        return safe_redis_get(key)
+        return redis_client.get(key)
     except Exception as e:
         print(f"Redis GET error: {e}")
         return None
