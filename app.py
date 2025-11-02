@@ -13,7 +13,12 @@ from controllers.async_service import get_results_async
 from utils.utils import calculate_sgpa, get_hallticket_helper
 
 # redis_client = redis.Redis(host="localhost", port=6379, db=0)
-redis_client = redis.from_url(os.environ.get("REDISURL"))
+redis_url = os.environ.get("REDISURL")
+if redis_url:
+    redis_client = redis.from_url(redis_url, decode_responses=True)
+else:
+    # Fallback for local development
+    redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
 # Initializing the Crawler object from service
 # Injecting the driver dependency
@@ -33,8 +38,8 @@ def index():
 def fetch_all_r18_results(hallticket):
     current_key = f"r18-{hallticket.lower()}"
 
-    redis_response = str(redis_client.get(current_key))
-    if redis_response != None:
+    redis_response = redis_client.get(current_key)
+    if redis_response is not None:
         data = json.loads(redis_response)
         return Response(json.dumps(data), mimetype="application/json")
     results = {}
@@ -84,7 +89,7 @@ def routing_path(hallticket, dob, year):
     current_key = f"{hallticket}-{year}"
 
     redis_response = redis_client.get(current_key)
-    if redis_response != None:
+    if redis_response is not None:
         result = json.loads(redis_response)
     else:
         result = old_scrapper.get_result(hallticket, dob, year)
@@ -101,7 +106,7 @@ def calculate(hallticket, dob, year):
     current_key = f"calculate-{hallticket}-{year}"
 
     redis_response = redis_client.get(current_key)
-    if redis_response != None:
+    if redis_response is not None:
         result = json.loads(redis_response)
     else:
         result = old_scrapper.get_result(hallticket, dob, year)
@@ -123,7 +128,7 @@ def request_param_path():
 
     current_key = f"result-{hallticket}-{year}"
     redis_response = redis_client.get(current_key)
-    if redis_response != None:
+    if redis_response is not None:
         result = json.loads(redis_response)
     else:
         result = old_scrapper.get_result(hallticket, dob, year)
@@ -140,7 +145,7 @@ def all_results():
     current_key = "all_exams"
 
     redis_response = redis_client.get(current_key)
-    if redis_response != None:
+    if redis_response is not None:
         all_exams = json.loads(redis_response)
     else:
         all_exams, _, _, _ = new_scrapper.get_all_results()
@@ -158,7 +163,7 @@ def all_regular():
         refresh = True
 
     redis_response = redis_client.get(current_key)
-    if redis_response != None and not refresh:
+    if redis_response is not None and not refresh:
         regular_exams = json.loads(redis_response)
     else:
         _, regular_exams, _, _ = new_scrapper.get_all_results()
@@ -176,7 +181,7 @@ def all_supply():
     if refresh is not None:
         refresh = True
     redis_response = redis_client.get(current_key)
-    if redis_response != None and not refresh:
+    if redis_response is not None and not refresh:
         supply_exams = json.loads(redis_response)
     else:
         _, _, supply_exams, _ = new_scrapper.get_all_results()
@@ -201,7 +206,7 @@ def get_specific_result():
     current_key = f"{hallticket}-{degree}-{examCode}-{etype}-{type}-{result}"
 
     redis_response = redis_client.get(current_key)
-    if redis_response != None:
+    if redis_response is not None:
         resp = json.loads(redis_response)
     else:
         resp = old_scrapper.get_result_with_url(
@@ -228,7 +233,7 @@ def get_specific_result_with_sgpa():
     current_key = f"calculate-{hallticket}-{
         degree}-{examCode}-{etype}-{type}-{result}"
     redis_response = redis_client.get(current_key)
-    if redis_response != None:
+    if redis_response is not None:
         result = json.loads(redis_response)
     else:
         resp = old_scrapper.get_result_with_url(
@@ -282,7 +287,7 @@ def get_bulk_results():
     redis_response = redis_client.get(
         hallticket_from + hallticket_to + examCode + etype + type
     )
-    if redis_response != None:
+    if redis_response is not None:
         return Response(redis_response, mimetype="application/json")
 
     # Check if all the halltickets are already cached, if so, return them.
@@ -295,7 +300,7 @@ def get_bulk_results():
         )
         redis_response = redis_client.get(current_key)
 
-        if redis_response != None:
+        if redis_response is not None:
             redis_out = json.loads(redis_response)
             results.append(redis_out)
         else:
@@ -352,7 +357,7 @@ def notifications():
     current_key = "notifications"
 
     redis_response = redis_client.get(current_key)
-    if redis_response != None and not refresh:
+    if redis_response is not None and not refresh:
         result = json.loads(redis_response)
     else:
         result = new_scrapper.get_notifiations()

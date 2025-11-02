@@ -2,9 +2,12 @@ import json
 import logging
 import re
 import requests
-
+import urllib3
 
 from bs4 import BeautifulSoup
+
+# Disable SSL warnings for older results.jntuh.ac.in certificates
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 LINK1 = "http://results.jntuh.ac.in"
 LINK2 = "http://202.63.105.184/results"
