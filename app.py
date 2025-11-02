@@ -33,7 +33,7 @@ def index():
 def fetch_all_r18_results(hallticket):
     current_key = f"r18-{hallticket.lower()}"
 
-    redis_response = redis_client.get(current_key)
+    redis_response = str(redis_client.get(current_key))
     if redis_response != None:
         data = json.loads(redis_response)
         return Response(json.dumps(data), mimetype="application/json")
@@ -225,7 +225,8 @@ def get_specific_result_with_sgpa():
     type = request.args.get("type")
     result = request.args.get("result") or ""
 
-    current_key = f"calculate-{hallticket}-{degree}-{examCode}-{etype}-{type}-{result}"
+    current_key = f"calculate-{hallticket}-{
+        degree}-{examCode}-{etype}-{type}-{result}"
     redis_response = redis_client.get(current_key)
     if redis_response != None:
         result = json.loads(redis_response)
@@ -326,11 +327,13 @@ def get_bulk_results():
             timedelta(minutes=10),
         )
 
-    threading.Thread(target=worker, args=(hallticket_from, hallticket_to)).start()
+    threading.Thread(target=worker, args=(
+        hallticket_from, hallticket_to)).start()
 
     # This is only going to return in the first call.
     return Response(
-        redis_client.get(hallticket_from + hallticket_to + examCode + etype + type),
+        redis_client.get(hallticket_from + hallticket_to +
+                         examCode + etype + type),
         mimetype="application/json",
     )
 

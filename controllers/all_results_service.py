@@ -37,7 +37,8 @@ class AllResults:
                 if not "b.tech" in description.lower():
                     continue
                 notifications.append(
-                    {"notification_date": date, "notification_description": description}
+                    {"notification_date": date,
+                        "notification_description": description}
                 )
             self.save_notifications(notifications)
 
@@ -86,6 +87,8 @@ class AllResults:
             )
             soup = BeautifulSoup(resp.text, "html.parser")
             div = soup.find("div", {"id": "panel"})
+            if not div:
+                raise Exception("something went wrong")
             soup = div.find("table")
             print(soup.contents)
             self.logger.info("SUCCESS IN SCRAPING DATA")
