@@ -20,6 +20,26 @@ else:
     # Fallback for local development
     redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
+# Helper functions for safe Redis operations
+def safe_redis_get(key):
+    """Safely get value from Redis, return None on error"""
+    try:
+        return safe_redis_get(key)
+    except Exception as e:
+        print(f"Redis GET error: {e}")
+        return None
+
+def safe_redis_set(key, value, expire_seconds=None):
+    """Safely set value in Redis, silently fail on error"""
+    try:
+        redis_client.set(key, value)
+        if expire_seconds:
+            redis_client.expire(key, timedelta(seconds=expire_seconds))
+        return True
+    except Exception as e:
+        print(f"Redis SET error: {e}")
+        return False
+
 # Initializing the Crawler object from service
 # Injecting the driver dependency
 old_scrapper = Service()
@@ -38,7 +58,7 @@ def index():
 def fetch_all_r18_results(hallticket):
     current_key = f"r18-{hallticket.lower()}"
 
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None:
         data = json.loads(redis_response)
         return Response(json.dumps(data), mimetype="application/json")
@@ -79,8 +99,7 @@ def fetch_all_r18_results(hallticket):
 
     # Cache only if results exist
     if results["results"]:
-        redis_client.set(current_key, json.dumps({"data": results}))
-        redis_client.expire(current_key, timedelta(hours=3))
+        safe_redis_set(current_key, json.dumps({"data": results}), expire_seconds=3*60*60)
     return Response(json.dumps({"data": results}), mimetype="application/json")
 
 
@@ -88,15 +107,14 @@ def fetch_all_r18_results(hallticket):
 def routing_path(hallticket, dob, year):
     current_key = f"{hallticket}-{year}"
 
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None:
         result = json.loads(redis_response)
     else:
         result = old_scrapper.get_result(hallticket, dob, year)
         if "error" in result:
             return Response(json.dumps(result), mimetype="application/json", status=503)
-        redis_client.set(current_key, json.dumps(result))
-        redis_client.expire(current_key, timedelta(minutes=30))
+        safe_redis_set(current_key, json.dumps(result), expire_seconds=30*60)
 
     return Response(json.dumps(result), mimetype="application/json")
 
@@ -105,7 +123,7 @@ def routing_path(hallticket, dob, year):
 def calculate(hallticket, dob, year):
     current_key = f"calculate-{hallticket}-{year}"
 
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None:
         result = json.loads(redis_response)
     else:
@@ -113,8 +131,7 @@ def calculate(hallticket, dob, year):
         if "error" in result:
             return Response(json.dumps(result), mimetype="application/json", status=503)
         result = calculate_sgpa(result)
-        redis_client.set(current_key, json.dumps(result))
-        redis_client.expire(current_key, timedelta(minutes=30))
+        safe_redis_set(current_key, json.dumps(result), expire_seconds=30*60)
 
     return Response(json.dumps(result), mimetype="application/json")
 
@@ -127,15 +144,14 @@ def request_param_path():
     year = request.args.get("year")
 
     current_key = f"result-{hallticket}-{year}"
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None:
         result = json.loads(redis_response)
     else:
         result = old_scrapper.get_result(hallticket, dob, year)
         if "error" in result:
             return Response(json.dumps(result), mimetype="application/json", status=503)
-        redis_client.set(current_key, json.dumps(result))
-        redis_client.expire(current_key, timedelta(minutes=30))
+        safe_redis_set(current_key, json.dumps(result), expire_seconds=30*60)
 
     return Response(json.dumps(result), mimetype="application/json")
 
@@ -144,13 +160,12 @@ def request_param_path():
 def all_results():
     current_key = "all_exams"
 
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None:
         all_exams = json.loads(redis_response)
     else:
         all_exams, _, _, _ = new_scrapper.get_all_results()
-        redis_client.set(current_key, json.dumps(all_exams))
-        redis_client.expire(current_key, timedelta(minutes=30))
+        safe_redis_set(current_key, json.dumps(all_exams), expire_seconds=30*60)
 
     return Response(json.dumps(all_exams), mimetype="application/json")
 
@@ -162,14 +177,13 @@ def all_regular():
     if refresh is not None:
         refresh = True
 
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None and not refresh:
         regular_exams = json.loads(redis_response)
     else:
         _, regular_exams, _, _ = new_scrapper.get_all_results()
         if regular_exams:
-            redis_client.set(current_key, json.dumps(regular_exams))
-            redis_client.expire(current_key, timedelta(minutes=30))
+            safe_redis_set(current_key, json.dumps(regular_exams), expire_seconds=30*60)
 
     return Response(json.dumps(regular_exams), mimetype="application/json")
 
@@ -180,14 +194,13 @@ def all_supply():
     refresh = request.args.get("refresh")
     if refresh is not None:
         refresh = True
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None and not refresh:
         supply_exams = json.loads(redis_response)
     else:
         _, _, supply_exams, _ = new_scrapper.get_all_results()
         if supply_exams:
-            redis_client.set(current_key, json.dumps(supply_exams))
-            redis_client.expire(current_key, timedelta(minutes=30))
+            safe_redis_set(current_key, json.dumps(supply_exams), expire_seconds=30*60)
 
     return Response(json.dumps(supply_exams), mimetype="application/json")
 
@@ -205,7 +218,7 @@ def get_specific_result():
 
     current_key = f"{hallticket}-{degree}-{examCode}-{etype}-{type}-{result}"
 
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None:
         resp = json.loads(redis_response)
     else:
@@ -214,8 +227,7 @@ def get_specific_result():
         )
         if "error" in resp:
             return Response(json.dumps(resp), mimetype="application/json", status=503)
-        redis_client.set(current_key, json.dumps(resp))
-        redis_client.expire(current_key, timedelta(minutes=30))
+        safe_redis_set(current_key, json.dumps(resp), expire_seconds=30*60)
 
     return Response(json.dumps(resp), mimetype="application/json")
 
@@ -232,7 +244,7 @@ def get_specific_result_with_sgpa():
 
     current_key = f"calculate-{hallticket}-{
         degree}-{examCode}-{etype}-{type}-{result}"
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None:
         result = json.loads(redis_response)
     else:
@@ -242,8 +254,7 @@ def get_specific_result_with_sgpa():
         if "error" in resp:
             return Response(json.dumps(resp), mimetype="application/json", status=503)
         result = calculate_sgpa(resp)
-        redis_client.set(current_key, json.dumps(result))
-        redis_client.expire(current_key, timedelta(minutes=30))
+        safe_redis_set(current_key, json.dumps(result), expire_seconds=30*60)
 
     return Response(json.dumps(result), mimetype="application/json")
 
@@ -284,7 +295,7 @@ def get_bulk_results():
     if end - start < 0 or end - start > 210:
         return Exception("SOMETHING WENT WRONG")
 
-    redis_response = redis_client.get(
+    redis_response = safe_redis_get(
         hallticket_from + hallticket_to + examCode + etype + type
     )
     if redis_response is not None:
@@ -298,7 +309,7 @@ def get_bulk_results():
         current_key = (
             f"calculate-{hallticket}-{degree}-{examCode}-{etype}-{type}-{result}"
         )
-        redis_response = redis_client.get(current_key)
+        redis_response = safe_redis_get(current_key)
 
         if redis_response is not None:
             redis_out = json.loads(redis_response)
@@ -309,12 +320,10 @@ def get_bulk_results():
         print("DIDN'T CREATE A NEW KEY, GOT RESULTS FROM HALLTICKETS CACHED")
         return Response(json.dumps(results), mimetype="application/json")
 
-    redis_client.set(
+    safe_redis_set(
         hallticket_from + hallticket_to + examCode + etype + type,
         json.dumps({"result": "loading"}),
-    )
-    redis_client.expire(
-        hallticket_from + hallticket_to + examCode, timedelta(minutes=10)
+        expire_seconds=10*60
     )
 
     def worker(hallticket_from, hallticket_to):
@@ -323,13 +332,10 @@ def get_bulk_results():
             hallticket_from, hallticket_to, examCode, etype, type, result, redis_client
         )
 
-        redis_client.set(
+        safe_redis_set(
             hallticket_from + hallticket_to + examCode + etype + type,
             json.dumps(results),
-        )
-        redis_client.expire(
-            hallticket_from + hallticket_to + examCode + etype + type,
-            timedelta(minutes=10),
+            expire_seconds=10*60
         )
 
     threading.Thread(target=worker, args=(
@@ -337,7 +343,7 @@ def get_bulk_results():
 
     # This is only going to return in the first call.
     return Response(
-        redis_client.get(hallticket_from + hallticket_to +
+        safe_redis_get(hallticket_from + hallticket_to +
                          examCode + etype + type),
         mimetype="application/json",
     )
@@ -356,13 +362,12 @@ def notifications():
         refresh = True
     current_key = "notifications"
 
-    redis_response = redis_client.get(current_key)
+    redis_response = safe_redis_get(current_key)
     if redis_response is not None and not refresh:
         result = json.loads(redis_response)
     else:
         result = new_scrapper.get_notifiations()
-        redis_client.set(current_key, json.dumps(result))
-        redis_client.expire(current_key, timedelta(minutes=30))
+        safe_redis_set(current_key, json.dumps(result), expire_seconds=30*60)
 
     return Response(json.dumps(result), mimetype="application/json")
 
