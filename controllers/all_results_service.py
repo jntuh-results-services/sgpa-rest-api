@@ -26,8 +26,9 @@ class AllResults:
 
     def get_notifiations(self) -> list:
         try:
+            print("coming here")
             resp = requests.get(
-                "http://results.jntuh.ac.in/jsp/RCRVInfo.jsp", timeout=3, verify=False
+                "http://results.jntuh.ac.in/jsp/RCRVInfo.jsp", timeout=10, verify=False
             )
             soup = BeautifulSoup(resp.text, "html.parser")
             notifications = []
@@ -37,12 +38,14 @@ class AllResults:
                 date, description = current.split(" ", 1)
                 date = date.lstrip("*(").rstrip(")")
                 description = description.strip()
-                if not "b.tech" in description.lower():
-                    continue
-                notifications.append(
-                    {"notification_date": date,
-                        "notification_description": description}
-                )
+                if "btech" in description.lower() or "b.tech" in description.lower():
+                    notifications.append(
+                        {"notification_date": date,
+                            "notification_description": description}
+                    )
+
+            print(
+                f'[LS] -> controllers/all_results_service.py:34 -> notifications: {notifications}\n')
             self.save_notifications(notifications)
 
         except Exception as e:

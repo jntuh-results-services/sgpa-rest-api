@@ -18,9 +18,12 @@ if redis_url:
     redis_client = redis.from_url(redis_url, decode_responses=True)
 else:
     # Fallback for local development
-    redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+    redis_client = redis.Redis(
+        host="localhost", port=6379, db=0, decode_responses=True)
 
 # Helper functions for safe Redis operations
+
+
 def safe_redis_get(key):
     """Safely get value from Redis, return None on error"""
     try:
@@ -28,6 +31,7 @@ def safe_redis_get(key):
     except Exception as e:
         print(f"Redis GET error: {e}")
         return None
+
 
 def safe_redis_set(key, value, expire_seconds=None):
     """Safely set value in Redis, silently fail on error"""
@@ -39,6 +43,7 @@ def safe_redis_set(key, value, expire_seconds=None):
     except Exception as e:
         print(f"Redis SET error: {e}")
         return False
+
 
 # Initializing the Crawler object from service
 # Injecting the driver dependency
@@ -99,7 +104,8 @@ def fetch_all_r18_results(hallticket):
 
     # Cache only if results exist
     if results["results"]:
-        safe_redis_set(current_key, json.dumps({"data": results}), expire_seconds=3*60*60)
+        safe_redis_set(current_key, json.dumps(
+            {"data": results}), expire_seconds=3*60*60)
     return Response(json.dumps({"data": results}), mimetype="application/json")
 
 
@@ -165,7 +171,8 @@ def all_results():
         all_exams = json.loads(redis_response)
     else:
         all_exams, _, _, _ = new_scrapper.get_all_results()
-        safe_redis_set(current_key, json.dumps(all_exams), expire_seconds=30*60)
+        safe_redis_set(current_key, json.dumps(
+            all_exams), expire_seconds=30*60)
 
     return Response(json.dumps(all_exams), mimetype="application/json")
 
@@ -183,7 +190,8 @@ def all_regular():
     else:
         _, regular_exams, _, _ = new_scrapper.get_all_results()
         if regular_exams:
-            safe_redis_set(current_key, json.dumps(regular_exams), expire_seconds=30*60)
+            safe_redis_set(current_key, json.dumps(
+                regular_exams), expire_seconds=30*60)
 
     return Response(json.dumps(regular_exams), mimetype="application/json")
 
@@ -200,7 +208,8 @@ def all_supply():
     else:
         _, _, supply_exams, _ = new_scrapper.get_all_results()
         if supply_exams:
-            safe_redis_set(current_key, json.dumps(supply_exams), expire_seconds=30*60)
+            safe_redis_set(current_key, json.dumps(
+                supply_exams), expire_seconds=30*60)
 
     return Response(json.dumps(supply_exams), mimetype="application/json")
 
@@ -344,7 +353,7 @@ def get_bulk_results():
     # This is only going to return in the first call.
     return Response(
         safe_redis_get(hallticket_from + hallticket_to +
-                         examCode + etype + type),
+                       examCode + etype + type),
         mimetype="application/json",
     )
 
@@ -362,12 +371,12 @@ def notifications():
         refresh = True
     current_key = "notifications"
 
-    redis_response = safe_redis_get(current_key)
-    if redis_response is not None and not refresh:
-        result = json.loads(redis_response)
-    else:
-        result = new_scrapper.get_notifiations()
-        safe_redis_set(current_key, json.dumps(result), expire_seconds=30*60)
+    # redis_response = safe_redis_get(current_key)
+    # if redis_response is not None and not refresh:
+    #     result = json.loads(redis_response)
+    # else:
+    result = new_scrapper.get_notifiations()
+    safe_redis_set(current_key, json.dumps(result), expire_seconds=30*60)
 
     return Response(json.dumps(result), mimetype="application/json")
 
